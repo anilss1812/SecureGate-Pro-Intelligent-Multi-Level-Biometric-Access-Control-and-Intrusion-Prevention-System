@@ -69,24 +69,30 @@ The system also provides an administrator interface for managing registered user
 
 The following block diagram illustrates the overall hardware and firmware interaction.
 
-```mermaid
-flowchart TD
-    USER[User] --> KEYPAD[4x4 Matrix Keypad]
-    KEYPAD --> MCU[LPC2148 ARM7 Controller]
+flowchart TB
+    U["USER"] --> K["4x4 MATRIX KEYPAD"]
+    A["ADMIN SWITCH"] --> E["EINT0 INTERRUPT"]
 
-    MCU <--> LCD[16x4 LCD Display]
-    MCU <--> FP[R305 Fingerprint Module]
-    MCU <--> EEPROM[I2C EEPROM]
+    K --> MCU["LPC2148 ARM7<br/>MAIN CONTROLLER"]
+    E --> MCU
 
-    MCU --> UART[UART0 Serial Communication]
-    UART --> PC[PC Serial Terminal]
+    MCU <--> LCD["16x4 LCD"]
+    MCU <--> FP["R305 FINGERPRINT<br/>UART1"]
+    MCU <--> EE["I2C EEPROM"]
+    MCU --> LOG["UART0 SERIAL LOG"]
+    LOG --> PC["PC TERMINAL"]
+    MCU --> MD["L293D MOTOR DRIVER"]
+    MD --> MOTOR["DC DOOR MOTOR"]
 
-    MCU --> DRIVER[L293D Motor Driver]
-    DRIVER --> MOTOR[DC Door Motor]
+    classDef input fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px
+    classDef controller fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:3px
+    classDef peripheral fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px
+    classDef output fill:#fce7f3,stroke:#db2777,color:#831843,stroke-width:2px
 
-    SWITCH[Administrator Switch] --> INT[EINT0 Interrupt]
-    INT --> MCU
-```
+    class U,A,K,E input
+    class MCU controller
+    class LCD,FP,EE,LOG,MD peripheral
+    class PC,MOTOR output
 
 ---
 
@@ -94,32 +100,37 @@ flowchart TD
 
 The system verifies the user's credentials in three stages before granting access.
 
-```mermaid
 flowchart TD
-    A([System Ready]) --> B[Enter User ID]
-    B --> C{User ID Exists?}
+    A([SYSTEM READY]) --> B["Enter User ID"]
+    B --> C{"User ID Valid?"}
 
-    C -- No --> D[Access Denied]
-    C -- Yes --> E[Enter Password]
+    C -->|No| X["ACCESS DENIED"]
+    C -->|Yes| D["Enter Password"]
 
-    E --> F{Password Correct?}
+    D --> E{"Password Valid?"}
+    E -->|No| X
+    E -->|Yes| F["Fingerprint Verification"]
 
-    F -- No --> D
-    F -- Yes --> G[Fingerprint Verification]
+    F --> G{"Fingerprint Match?"}
+    G -->|No| X
+    G -->|Yes| H["ACCESS GRANTED"]
 
-    G --> H{Fingerprint Matches?}
+    H --> I["Door Opening"]
+    I --> J["Door Hold"]
+    J --> K["Door Closing"]
 
-    H -- No --> D
-    H -- Yes --> I[Access Granted]
+    K --> B
+    X --> B
 
-    I --> J[Open Door]
-    J --> K[Hold Door Open]
-    K --> L[Close Door]
+    classDef process fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px
+    classDef decision fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px
+    classDef success fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px
+    classDef failure fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px
 
-    D --> M[Return to Authentication]
-    L --> M
-    M --> B
-```
+    class B,D,F,I,J,K process
+    class C,E,G decision
+    class H success
+    class X failure
 
 **Authentication Rule:** Access is granted only when the User ID, password, and fingerprint are successfully verified.
 
