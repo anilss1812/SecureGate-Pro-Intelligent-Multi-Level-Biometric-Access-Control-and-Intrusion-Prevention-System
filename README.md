@@ -132,8 +132,6 @@ flowchart TD
     class H success
     class X failure
 
-**Authentication Rule:** Access is granted only when the User ID, password, and fingerprint are successfully verified.
-
 ---
 
 ## Administrator Module
