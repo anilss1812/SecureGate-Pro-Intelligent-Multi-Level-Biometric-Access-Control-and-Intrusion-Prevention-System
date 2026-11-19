@@ -2,38 +2,38 @@
 # SecureGate Pro
 ### LPC2148-Based Multi-Level Authentication and Door Access Control System
 
-## Project Overview
+## Overview
 
-**SecureGate Pro** is an embedded security and access-control system developed using the **NXP LPC2148 ARM7 microcontroller** and Embedded C.
+**SecureGate Pro** is an embedded security and access-control system developed using the **LPC2148 ARM7 microcontroller** and register-level Embedded C programming.
 
 The system provides three-level user authentication using:
 
 1. User ID verification
 2. Password verification
-3. Fingerprint authentication using the R305 fingerprint module
+3. Fingerprint verification
 
-The door opens only when all three authentication stages are successful. An administrator interface is also provided to manage users, passwords, fingerprints, and the stored user database.
+The door is unlocked only when all three authentication stages are successful.
 
-The firmware is developed using register-level programming in Embedded C.
+The system also provides an administrator interface for managing registered users, passwords, fingerprints, and the user database. An LCD displays system information, while UART0 provides real-time serial messages for monitoring and debugging.
 
 ---
 
 ## Key Features
 
-- Three-level authentication (User ID, Password, Fingerprint).
-- R305 fingerprint module integration through UART1.
-- External I2C EEPROM for persistent user data storage.
-- Administrator authentication and management menu.
+- Three-level user authentication (User ID, Password, Fingerprint).
+- Fingerprint authentication using the R305 fingerprint module.
+- Secure user record storage using external I2C EEPROM.
+- Administrator authentication and protected menu.
 - Add and delete registered users.
 - Update user passwords.
 - Update registered fingerprints.
 - Change administrator password.
-- Clear user database and fingerprint templates.
-- 16x4 LCD for displaying system information.
-- 4x4 matrix keypad for user interaction.
-- L293D motor driver for door opening and closing.
-- UART0 serial communication for system messages and debugging.
-- External interrupt (EINT0) for administrator menu access.
+- Clear the user database.
+- Automatic fingerprint ID allocation.
+- LCD-based user interaction and system status display.
+- UART-based debugging and event monitoring.
+- Interrupt-based administrator menu access.
+- DC motor-based door opening and closing using L293D.
 
 ---
 
@@ -41,40 +41,40 @@ The firmware is developed using register-level programming in Embedded C.
 
 | Component | Description |
 |---|---|
-| LPC2148 | ARM7-based main microcontroller |
-| 16x4 LCD | Displays authentication and system status |
+| LPC2148 | ARM7 main microcontroller |
+| 16x4 LCD | User interface and status display |
 | 4x4 Matrix Keypad | User input and menu navigation |
-| R305 Fingerprint Module | Fingerprint enrolment and identification |
-| I2C EEPROM | Stores user credentials and administrator password |
-| L293D Motor Driver | Controls DC motor direction |
+| R305 Fingerprint Module | Fingerprint enrolment and verification |
+| I2C EEPROM | Persistent user and administrator data storage |
+| MAX232 / Serial Interface | UART communication with PC |
+| L293D | DC motor driver |
 | DC Motor | Door opening and closing mechanism |
-| MAX232 / Serial Interface | UART0 communication with PC terminal |
 | External Switch | Administrator menu request through EINT0 |
 
 ---
 
 ## Communication Protocols
 
-| Protocol | Connected Module | Purpose |
-|---|---|---|
-| UART0 | PC Serial Terminal | Debugging and system messages |
-| UART1 | R305 Fingerprint Sensor | Fingerprint communication |
-| I2C | External EEPROM | User database storage |
-| GPIO | LCD | Display control and data |
-| GPIO | Matrix Keypad | Key scanning |
-| GPIO | L293D | Motor control |
-| EINT0 | External Switch | Administrator menu request |
+| Protocol | Application |
+|---|---|
+| UART0 | Serial monitoring and debugging |
+| UART1 | R305 fingerprint module communication |
+| I2C | External EEPROM communication |
+| GPIO | LCD, keypad and motor control |
+| EINT0 | External interrupt for administrator menu request |
 
 ---
 
 ## System Architecture
+
+The following block diagram illustrates the overall hardware and firmware interaction.
 
 ```mermaid
 flowchart TD
     USER[User] --> KEYPAD[4x4 Matrix Keypad]
     KEYPAD --> MCU[LPC2148 ARM7 Controller]
 
-    MCU <--> LCD[16x4 LCD]
+    MCU <--> LCD[16x4 LCD Display]
     MCU <--> FP[R305 Fingerprint Module]
     MCU <--> EEPROM[I2C EEPROM]
 
@@ -82,64 +82,56 @@ flowchart TD
     UART --> PC[PC Serial Terminal]
 
     MCU --> DRIVER[L293D Motor Driver]
-    DRIVER --> MOTOR[DC Motor / Door]
+    DRIVER --> MOTOR[DC Door Motor]
 
-    SWITCH[Admin Switch] --> EINT[EINT0 Interrupt]
-    EINT --> MCU
+    SWITCH[Administrator Switch] --> INT[EINT0 Interrupt]
+    INT --> MCU
 ```
 
 ---
 
-## Authentication Workflow
+## User Authentication Flow
 
-The system verifies the user through three authentication stages before granting access.
-
-### Authentication State Machine
+The system verifies the user's credentials in three stages before granting access.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> EnterUserID
+flowchart TD
+    A([System Ready]) --> B[Enter User ID]
+    B --> C{User ID Exists?}
 
-    EnterUserID --> VerifyUserID
+    C -- No --> D[Access Denied]
+    C -- Yes --> E[Enter Password]
 
-    VerifyUserID --> AccessDenied: Invalid User ID
-    VerifyUserID --> EnterPassword: User ID Matched
+    E --> F{Password Correct?}
 
-    EnterPassword --> AccessDenied: Wrong Password
-    EnterPassword --> FingerprintVerification: Password Matched
+    F -- No --> D
+    F -- Yes --> G[Fingerprint Verification]
 
-    FingerprintVerification --> AccessDenied: Fingerprint Mismatch
-    FingerprintVerification --> AccessGranted: Fingerprint Matched
+    G --> H{Fingerprint Matches?}
 
-    AccessGranted --> DoorOpening
-    DoorOpening --> DoorOpen
-    DoorOpen --> DoorClosing
-    DoorClosing --> EnterUserID
+    H -- No --> D
+    H -- Yes --> I[Access Granted]
 
-    AccessDenied --> EnterUserID
+    I --> J[Open Door]
+    J --> K[Hold Door Open]
+    K --> L[Close Door]
+
+    D --> M[Return to Authentication]
+    L --> M
+    M --> B
 ```
 
-**Access is granted only after successful verification of the User ID, password, and fingerprint.**
-
-### Authentication Process
-
-1. User enters a four-digit User ID through the keypad.
-2. The system searches the EEPROM database.
-3. If the User ID exists, the system requests the password.
-4. The entered password is compared with the stored password.
-5. If the password matches, the system requests fingerprint authentication.
-6. The R305 module identifies the fingerprint.
-7. The identified fingerprint ID is compared with the fingerprint ID associated with the user.
-8. If all three stages are successful, access is granted.
-9. The motor driver opens the door for the configured duration and then closes it.
+**Authentication Rule:** Access is granted only when the User ID, password, and fingerprint are successfully verified.
 
 ---
 
-## Administrator Menu
+## Administrator Module
 
-The administrator menu is accessed through an external interrupt switch connected to EINT0.
+The administrator menu is accessed through the external interrupt switch connected to EINT0.
 
-After entering the correct administrator password, the administrator can access the following options.
+The administrator must enter the correct administrator password before accessing the management functions.
+
+### Administrator Menu Options
 
 | Option | Function |
 |---|---|
@@ -147,75 +139,133 @@ After entering the correct administrator password, the administrator can access 
 | 2 | Update User Fingerprint |
 | 3 | Add New User |
 | 4 | Delete Existing User |
-| 5 | Clear Database |
+| 5 | Clear User Database |
 | 6 | Change Administrator Password |
 | 7 | Exit Administrator Menu |
 
 ### User Registration Process
 
-1. Enter a new four-digit User ID.
+1. Enter a new User ID.
 2. Check whether the User ID already exists.
 3. Allocate an available fingerprint ID.
-4. Enter and confirm a four-digit password.
-5. Enrol the fingerprint using the R305 module.
-6. Store the user information in external EEPROM.
+4. Enter the password.
+5. Re-enter the password for confirmation.
+6. Enrol the fingerprint using the R305 module.
+7. Store the user record in external EEPROM after successful enrolment.
 
-### Password Update Process
-
-1. Enter the existing User ID.
-2. Verify the current password.
-3. Enter the new password.
-4. Confirm the new password.
-5. Update the password in EEPROM if both entries match.
-
-### Fingerprint Update Process
+### User Fingerprint Update
 
 1. Enter the existing User ID.
-2. Verify the user's current password.
+2. Verify the current user password.
 3. Delete the previously registered fingerprint.
-4. Enrol a new fingerprint using the same allocated fingerprint ID.
+4. Enrol the new fingerprint using the allocated fingerprint ID.
 
-### Database Reset
+### User Deletion
 
-- Clears the stored user records in EEPROM.
-- Deletes all fingerprint templates from the R305 module.
-- Resets the administrator password to the default password `1234`.
+1. Enter the registered User ID.
+2. Search for the user record.
+3. Delete the corresponding fingerprint template.
+4. Update the user record status in EEPROM.
+
+---
+
+## Administrator Workflow
+
+```mermaid
+flowchart TD
+    A([System Running]) --> B[EINT0 Switch Pressed]
+    B --> C[Administrator Password]
+    C --> D{Password Valid?}
+
+    D -- No --> E[Access Rejected]
+    D -- Yes --> F[Administrator Menu]
+
+    F --> G[Add User]
+    F --> H[Delete User]
+    F --> I[Update Password]
+    F --> J[Update Fingerprint]
+    F --> K[Clear Database]
+    F --> L[Change Admin Password]
+    F --> M[Exit]
+
+    G --> F
+    H --> F
+    I --> F
+    J --> F
+    K --> F
+    L --> F
+
+    E --> A
+    M --> A
+```
+
+---
+
+## Firmware Architecture
+
+The firmware is developed using Embedded C with register-level peripheral programming.
+
+The source code is organised into separate modules for better readability, debugging, and maintenance.
+
+| Module | Responsibility |
+|---|---|
+| `main.c` | Main application logic, authentication and administrator menu |
+| `main_defines.c / .h` | User ID and password input handling |
+| `lcd.c / .h` | LCD initialization and display functions |
+| `lcd_defines.h` | LCD configuration definitions |
+| `keypad.c / .h` | Matrix keypad scanning |
+| `keypad_defines.h` | Keypad pin definitions |
+| `uart.c / .h` | UART0 and UART1 communication |
+| `uart_defines.h` | UART configuration |
+| `fingerprint.c / .h` | R305 fingerprint communication and operations |
+| `database.c / .h` | User records and administrator password management |
+| `i2c.c / .h` | LPC2148 I2C peripheral communication |
+| `i2c_defines.h` | I2C configuration definitions |
+| `i2c_eeprom.c / .h` | EEPROM read and write operations |
+| `i2c_eeprom_defines.h` | EEPROM slave address definitions |
+| `motor.c / .h` | Door motor control |
+| `interrupt.c / .h` | EINT0 interrupt configuration |
+| `rtc.c / .h` | RTC initialization |
+| `delay.c / .h` | Software delay functions |
+| `log.c / .h` | UART0 logging support |
+| `types.h` | Common project data type definitions |
 
 ---
 
 ## LPC2148 Pin Configuration
 
-The following pin assignments are based on the project source code.
-
 | LPC2148 Pin | Peripheral | Function |
 |---|---|---|
-| P0.0 | UART0 | TXD0 |
-| P0.1 | UART0 | RXD0 |
+| P0.0 | UART0 | TX |
+| P0.1 | UART0 | RX |
 | P0.2 | I2C | SCL |
 | P0.3 | I2C | SDA |
 | P0.4 | L293D | Motor IN1 |
 | P0.5 | L293D | Motor IN2 |
 | P0.7 | L293D | Motor Enable |
-| P0.8 | UART1 | TXD1 |
-| P0.9 | UART1 | RXD1 |
+| P0.8 | UART1 | TX |
+| P0.9 | UART1 | RX |
 | P0.12 | LCD | RS |
 | P0.13 | LCD | EN |
 | P0.16 | EINT0 | Administrator Switch |
-| P1.16–P1.19 | Keypad | Row Lines |
-| P1.20–P1.23 | Keypad | Column Lines |
-| P1.24–P1.31 | LCD | Data Lines D0–D7 |
+| P1.16-P1.19 | Keypad | Row Pins |
+| P1.20-P1.23 | Keypad | Column Pins |
+| P1.24-P1.31 | LCD | Data Bus D0-D7 |
 
 ---
 
-## EEPROM Database Organisation
+## EEPROM Data Management
 
-The external I2C EEPROM stores administrator credentials and user records.
+External I2C EEPROM is used for storing user records and administrator password information.
 
-| Parameter | Configuration |
+### EEPROM Configuration
+
+| Parameter | Value |
 |---|---|
-| I2C Slave Address | `0x50` |
-| Administrator Password Address | `0–3` |
-| User Database Starting Address | `10` |
+| Communication | I2C |
+| Slave Address | 0x50 |
+| Administrator Password Address | 0 |
+| User Records Starting Address | 10 |
 | Maximum User Records | 9 |
 | Record Size | 10 Bytes |
 
@@ -223,81 +273,12 @@ The external I2C EEPROM stores administrator credentials and user records.
 
 Each user record contains:
 
-| Field | Data Type | Size |
-|---|---|---|
-| User ID | `u32` | 4 Bytes |
-| Password | `u32` | 4 Bytes |
-| Fingerprint ID | `u8` | 1 Byte |
-| Record Status | `u8` | 1 Byte |
+- User ID
+- User Password
+- Fingerprint ID
+- Record Status
 
-The database supports active and deleted record identification using status values.
-
----
-
-## Firmware Modules
-
-The project firmware is organised into separate source and header files for modular development.
-
-| Module | Responsibility |
-|---|---|
-| `main.c` | Main application logic and authentication workflow |
-| `main_defines.c/.h` | User ID and password input handling |
-| `lcd.c/.h` | LCD initialization and display operations |
-| `lcd_defines.h` | LCD command and pin definitions |
-| `keypad.c/.h` | Matrix keypad scanning |
-| `keypad_defines.h` | Keypad pin definitions |
-| `uart.c/.h` | UART0 and UART1 communication |
-| `uart_defines.h` | UART configuration definitions |
-| `fingerprint.c/.h` | R305 fingerprint commands and operations |
-| `database.c/.h` | User database and administrator password management |
-| `i2c.c/.h` | I2C peripheral communication |
-| `i2c_defines.h` | I2C configuration definitions |
-| `i2c_eeprom.c/.h` | EEPROM read and write operations |
-| `i2c_eeprom_defines.h` | EEPROM-related definitions |
-| `motor.c/.h` | Door motor control |
-| `interrupt.c/.h` | EINT0 interrupt configuration |
-| `rtc.c/.h` | RTC initialization |
-| `delay.c/.h` | Software delay functions |
-| `types.h` | Common data type definitions |
-| `log.c/.h` | Serial logging support |
-
----
-
-## UART Serial Output
-
-UART0 is configured for serial communication with the PC terminal.
-
-**UART0 Configuration:**
-
-- Baud Rate: 9600
-- Data Bits: 8
-- Parity: None
-- Stop Bits: 1
-- Communication: UART0
-
-### Example System Messages
-
-```text
-*****WELCOME TO*****
-***SECUREGATE PRO***
-
-USER ID:MATCHED
-PASSWORD:MATCHED
-FINGER:MATCHED
-ACCESS GRANTED
-DOOR OPENING
-DOOR CLOSING
-```
-
-### Test Output Logs
-
-The development archive contains the following UART output log files:
-
-- `log1.TXT`
-- `log2.TXT`
-- `log3.TXT`
-
-These logs document testing of authentication and administrator operations, including successful access, invalid credentials, fingerprint verification, user management, and database reset.
+The database module provides functions for adding, searching, updating, deleting, and clearing user records.
 
 ---
 
@@ -305,81 +286,150 @@ These logs document testing of authentication and administrator operations, incl
 
 The L293D motor driver controls the DC motor used for door movement.
 
-| Operation | Motor Direction | Configured Duration |
-|---|---|---|
-| Door Opening | Forward | 3000 ms |
-| Door Hold | 2000 ms | Configured delay |
-| Door Closing | Reverse | 3000 ms |
+The motor operates in two directions:
 
-The current firmware uses time-based motor control. The door limit-switch option is disabled in the current motor configuration.
+- Forward direction: Door opening.
+- Reverse direction: Door closing.
+
+### Door Operation Sequence
+
+| Operation | Duration |
+|---|---|
+| Door Opening | 3000 ms |
+| Door Hold | 2000 ms |
+| Door Closing | 3000 ms |
+
+**Note:** The current firmware uses time-based motor control. The door limit-switch input is disabled in the current configuration.
+
+---
+
+## UART Monitoring and Debugging
+
+UART0 is used to transmit system messages to a PC serial terminal.
+
+### UART0 Configuration
+
+| Parameter | Value |
+|---|---|
+| Baud Rate | 9600 |
+| Data Bits | 8 |
+| Parity | None |
+| Stop Bits | 1 |
+
+### Sample Serial Messages
+
+```text
+====================
+*****WELCOME TO*****
+***SECUREGATE PRO***
+====================
+
+ID FOUND
+PASSWORD MATCHED
+ACCESS GRANTED
+
+DOOR OPENING
+DOOR CLOSING
+
+ACCESS DENIED
+USER ADDED SUCCESSFULLY
+USER DELETED
+UPDATED SUCCESSFULLY
+```
+
+### Test Output Logs
+
+The development archive contains the following serial output log files:
+
+- `log1.TXT`
+- `log2.TXT`
+- `log3.TXT`
+
+These logs document testing of authentication, user management, fingerprint operations, and database functions.
 
 ---
 
 ## Development Environment
 
-| Tool / Technology | Purpose |
+| Tool | Purpose |
 |---|---|
+| Keil µVision | Embedded C development and compilation |
+| Proteus | Circuit simulation and hardware testing |
+| LPC2148 | Target microcontroller |
+| Serial Terminal | UART communication and debugging |
 | Embedded C | Firmware development |
-| Keil µVision | Code development and compilation |
-| LPC2148 ARM7 | Target microcontroller |
-| Proteus | Circuit simulation |
-| UART Terminal | Serial output monitoring |
-| I2C | EEPROM communication |
-| UART | Fingerprint module communication |
 
 ---
 
 ## Build and Programming
 
 1. Open the project in Keil µVision.
-2. Select the LPC2148 target microcontroller.
+2. Select the LPC2148 microcontroller.
 3. Add the required `.c` source files to the project.
-4. Ensure the corresponding `.h` header files are accessible.
-5. Configure the target clock and linker settings.
+4. Include the corresponding `.h` header files.
+5. Configure the target clock and project settings.
 6. Compile and build the firmware.
-7. Generate the HEX firmware image.
-8. Flash the firmware onto the LPC2148 using a compatible programming tool.
-9. Connect UART0 to a serial terminal configured for 9600 baud, 8N1.
+7. Resolve any compilation or linker errors.
+8. Generate the HEX firmware file.
+9. Flash the generated firmware into the LPC2148.
+10. Connect the UART0 serial interface to monitor system messages.
+
+The generated firmware image in the development archive is:
+
+`securegate_pro.hex`
 
 ---
 
 ## Repository Contents
 
-This GitHub repository contains only the Embedded C source and header files, along with this README documentation.
+This GitHub repository contains the Embedded C source code and header files required to understand and develop the SecureGate Pro firmware.
+
+### File Types
 
 - `.c` – Embedded C source files
 - `.h` – Header files
+- `README.md` – Project documentation
 
 ### Development and Testing Artifacts
 
-The following files are referenced for documentation purposes but are not included in the GitHub repository:
+The following files are mentioned for reference but are not included in this source-only GitHub repository:
 
-- `securegate_pro.hex` – Generated firmware image.
-- `log1.TXT` – UART output log.
-- `log2.TXT` – UART output log.
-- `log3.TXT` – UART output log.
-
----
-
-## Project Summary
-
-**SecureGate Pro** demonstrates the practical implementation of embedded systems concepts through a multi-level authentication and automated door access-control application.
-
-The project involves:
-
-- ARM7 LPC2148 microcontroller programming.
-- Register-level Embedded C development.
-- UART communication and fingerprint sensor integration.
-- I2C EEPROM interfacing and database management.
-- LCD and matrix keypad interfacing.
-- External interrupt handling.
-- DC motor control using L293D.
-- Modular firmware development and debugging.
+- `securegate_pro.hex` – Compiled firmware output
+- `log1.TXT` – Serial output log
+- `log2.TXT` – Serial output log
+- `log3.TXT` – Serial output log
 
 ---
 
-**Project Name:** SecureGate Pro  
-**Microcontroller:** NXP LPC2148 (ARM7)  
-**Programming Language:** Embedded C  
-**Development Environment:** Keil µVision  
-**Application:** Multi-Level Authentication and Door Access Control System
+## Project Highlights
+
+- Developed bare-metal Embedded C firmware for the LPC2148 ARM7 microcontroller.
+- Implemented UART communication with the R305 fingerprint module.
+- Integrated I2C EEPROM for persistent user data storage.
+- Developed a multi-level authentication mechanism.
+- Implemented an administrator interface for user and database management.
+- Integrated LCD, keypad, external interrupt, and DC motor control.
+- Used modular programming for peripheral interfacing and application development.
+- Implemented UART-based debugging and system monitoring.
+
+---
+
+## Project Information
+
+| Category | Details |
+|---|---|
+| Project Name | SecureGate Pro |
+| Controller | LPC2148 |
+| Architecture | ARM7 |
+| Programming Language | Embedded C |
+| Programming Approach | Register-Level / Bare-Metal |
+| Fingerprint Module | R305 |
+| Communication | UART, I2C, GPIO |
+| Development IDE | Keil µVision |
+| Simulation | Proteus |
+
+---
+
+**SecureGate Pro – Embedded Access Control System**
+
+*Designed and developed using LPC2148 ARM7 and Embedded C.*
